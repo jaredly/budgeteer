@@ -1,105 +1,20 @@
 open Utils;
 open Types;
 
-let latestBudget budgets year month => {
-  switch budgets {
-  | [] => failwith "No budgets"
-  | [first, ...rest] =>
-    List.fold_left
-    (fun current next => {
-      if (next.startYear !== year || next.startMonth > month) {
-        current
-      } else {
-        next
-      }
-    })
-    first
-    rest
-  }
+let module Styles = {
+  open Glamor;
+  let base = [padding "8px", fontVariantNumeric "tabular-nums"];
+  let goal = css [textAlign "right", ...base];
+  let actual = css [textAlign "right", ...base];
+  let diff = css [textAlign "right", ...base];
+  let name = css [padding "8px 8px 8px 32px"];
+  let sumName = css [padding "8px 16px", fontWeight "600"];
+  let calcName = css [padding "8px 16px", fontWeight "600"];
+  let title = css [padding "8px 16px", marginTop "16px"];
 };
 
-let row item => switch item {
-| Title _ num
-| Calculated _ num _ _
-| Sum _ num _
-| Item _ num _ _ _ => num
-};
-
-let force opt => switch opt { | Some v => v | None => failwith "Forced a none"};
-
-let module StringSet = Set.Make {type t = string; let compare = compare};
-
-/* type calcState = Unresolved | Resolving | Resolved float; */
-let findAmounts items categoryMap => {
-  let maxRow = Array.fold_left (fun num item => max num (row item)) 0 items;
-  let amounts = Array.make (maxRow + 1) `Unresolved;
-  let itemsByRow = Array.make (maxRow + 1) None;
-  let touchedCategories = ref StringSet.empty;
-  Array.iter (fun item => itemsByRow.(row item) = Some item) items;
-  let rec resolve item => {
-    let thisRow = row item;
-    switch amounts.(thisRow) {
-    | `Resolved value => value
-    | `Resolving => failwith "Recursive definition"
-    | `Unresolved => {
-        /* Js.log3 thisRow item amounts.(thisRow); */
-        amounts.(thisRow) = `Resolving;
-        let value = switch item {
-        | Title _ => 0.
-        | Item _ _ _ categories _ => (Array.fold_left
-            (fun total category => {
-              touchedCategories := StringSet.add category !touchedCategories;
-              total +. (Js.Dict.get categoryMap category |> optMap (fun c => c.monthTotal) |> optOr 0.)
-            })
-            0.
-            categories)
-        | Calculated _ _ calc _ => doCalc calc
-        | Sum _ _ (fromRow, toRow) => {
-          /* Js.log3 "summing" fromRow toRow; */
-          let total = ref 0.;
-          for i in fromRow to toRow {
-            let next = switch itemsByRow.(i - 1) {
-            | Some item => resolve item
-            | None => 0.
-            };
-            /* Js.log2 i next; */
-            total := !total +. next;
-          };
-          /* Js.log2 "Summed" !total; */
-          !total
-        }
-        };
-        /* Js.log3 "Finished" value item; */
-        amounts.(row item) = `Resolved value;
-        value
-      }
-    }
-  } and doCalc calc => switch calc {
-  | Unit => 0.
-  | Plus one two => doCalc one +. doCalc two
-  | Minus one two => {
-    Js.log3 "minus" one two;
-    let a = doCalc one;
-    let b = doCalc two;
-    Js.log4 "was" a b (one, two);
-    a -. b
-  }
-  | Row at => resolve (force itemsByRow.(at - 1)) /* TODO may be off by 1 */
-  }
-  ;
-  for i in 0 to (Array.length items - 1) {
-    resolve (items.(i)) |> ignore;
-  };
-  let amounts = Array.map (fun amount => switch amount {
-  | `Unresolved => 0.
-  | `Resolving => 0.
-  | `Resolved value => value
-  })
-  amounts;
-  let untouched = Js.Dict.keys categoryMap
-  |> Js.Array.filter
-  (fun cat => not (StringSet.mem cat !touchedCategories) && (Js.Dict.unsafeGet categoryMap cat).monthTotal > 0.);
-  (amounts, untouched)
+let dollars num => {
+  Printf.sprintf "$%0.2f" num
 };
 
 let component = ReasonReact.statelessComponent "ReportView";
@@ -108,44 +23,47 @@ let component = ReasonReact.statelessComponent "ReportView";
 let make ::budgets ::transactions ::year ::month _children => ReasonReact.{
   ...component,
   render: fun _ => {
-    let budget = latestBudget budgets year month;
-    let amounts = try (Some (findAmounts budget.items transactions)) {
+    let budget = Budget.latestBudget budgets year month;
+    let amounts = try (Some (Budget.findAmounts budget.items transactions)) {
     | err => {Js.log err; None}
     };
     [%guard let Some amounts = amounts][@else <div>(str "Errored")</div>];
     let (amounts, untouched) = amounts;
     Js.log amounts;
+
     <div>
-      (str "hi")
+      (spacer 32)
       <table>
       <thead>
-        <th>(str "Name")</th>
-        <th>(str "Goal")</th>
-        <th>(str "Actual")</th>
-        <th>(str "Diff")</th>
-        <th>(str "YTD")</th>
+        <tr>
+          <th>(str "Name")</th>
+          <th>(str "Goal")</th>
+          <th>(str "Actual")</th>
+          <th>(str "Diff")</th>
+          <th>(str "YTD")</th>
+        </tr>
       </thead>
       <tbody>
         {
           Array.map
           (fun item => switch item {
-            | Title name row => <tr> <td className=Glamor.(css[paddingTop "16px"])>(str name)</td> </tr>
+            | Title name row => <tr> <td className=Styles.title>(str name)</td> </tr>
             | Item name row _ _ goal => <tr>
-                <td> (str name)  </td>
-                <td> (str (goal |> optMap string_of_float |> optOr "")) </td>
-                <td> (str (string_of_float amounts.(row))) </td>
-                <td> (str (goal |> optMap (fun n => n -. amounts.(row)) |> optMap string_of_float |> optOr "")) </td>
+                <td className=Styles.name> (str name)  </td>
+                <td className=Styles.goal> (str (goal |> optMap dollars |> optOr "")) </td>
+                <td className=Styles.actual> (str (dollars amounts.(row))) </td>
+                <td className=Styles.diff> (str (goal |> optMap (fun n => n -. amounts.(row)) |> optMap dollars |> optOr "")) </td>
                 </tr>
             | Calculated name row _ goal => <tr>
-                <td className=Glamor.(css[fontWeight "600"])> (str name)  </td>
-                <td> (str (string_of_float goal)) </td>
-                <td> (str (string_of_float amounts.(row))) </td>
-                <td> (str (string_of_float @@ goal -. amounts.(row))) </td>
+                <td className=Styles.calcName> (str name)  </td>
+                <td className=Styles.goal> (str (dollars goal)) </td>
+                <td className=Styles.actual> (str (dollars amounts.(row))) </td>
+                <td className=Styles.diff> (str (dollars @@ goal -. amounts.(row))) </td>
               </tr>
             | Sum name row _ => <tr>
-                <td className=Glamor.(css[fontWeight "600"])> (str name)  </td>
-                <td> /** TODO the sum of the goals */ </td>
-                <td> (str (string_of_float amounts.(row))) </td>
+                <td className=Styles.sumName> (str name)  </td>
+                <td className=Styles.goal> /** TODO the sum of the goals */ </td>
+                <td className=Styles.actual> (str (dollars amounts.(row))) </td>
                 </tr>
           })
           budget.items

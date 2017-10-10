@@ -11,7 +11,7 @@ let make ::budgetData ::transactionData ::render _children => ReasonReact.{
   ...component,
   initialState: fun () => currentMonthYear (),
   reducer: fun action _ => ReasonReact.Update action,
-  render: fun {state: (year, month)} => {
+  render: fun {state: (year, month), reduce} => {
     let (budgets, warnings) = Budget.parseBudgets budgetData;
     let (transactions, transactionWarnings, months) = Transactions.parseTransactions year month transactionData;
 
@@ -25,7 +25,15 @@ let make ::budgetData ::transactionData ::render _children => ReasonReact.{
           (List.map str transactionWarnings |> Array.of_list |> ReasonReact.arrayToElement)
         </div>
         (spacer 16)
-        (str @@ (string_of_int year) ^ ":" ^ (string_of_int month))
+        <div className=Glamor.(css[flexDirection "row", justifyContent "center"])>
+        <button onClick=(reduce (fun _ => month === 0 ? (year - 1, 11) : (year, month - 1)))>
+          (str "<")
+        </button>
+        (str @@ (string_of_int year) ^ ":" ^ (string_of_int (month + 1)))
+        <button onClick=(reduce (fun _ => month === 11 ? (year + 1, 0) : (year, month + 1)))>
+          (str ">")
+        </button>
+        </div>
         (spacer 8)
         {render budgets transactions year month}
     </div>
