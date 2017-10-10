@@ -191,34 +191,50 @@ let findAmounts items categoryMap => {
   let rec resolve item => {
     let thisRow = row item;
     switch amounts.(thisRow) {
-    | `Resolved value => value
+    | `Resolved (goal, month, year) => (goal, month, year)
     | `Resolving => failwith "Recursive definition"
     | `Unresolved => {
         /* Js.log3 thisRow item amounts.(thisRow); */
         amounts.(thisRow) = `Resolving;
         let value = switch item {
-        | Title _ => 0.
-        | Item _ _ _ categories _ => (Array.fold_left
-            (fun total category => {
-              touchedCategories := StringSet.add category !touchedCategories;
-              total +. (Js.Dict.get categoryMap category |> optMap (fun c => c.monthTotal) |> optOr 0.)
-            })
-            0.
-            categories)
-        | Calculated _ _ calc _ _ => doCalc calc
+        | Title _ => (0., 0., 0.)
+        | Item _ _ _ categories goal => {
+            let (month, year) = (Array.fold_left
+              (fun (month, year) category => {
+                touchedCategories := StringSet.add category !touchedCategories;
+                let catVal = Js.Dict.get categoryMap category;
+                (
+                  month +. (catVal |> optMap (fun c => c.monthTotal) |> optOr 0.),
+                  year +. (catVal |> optMap (fun c => c.yearTotal) |> optOr 0.)
+                )
+              })
+              (0., 0.)
+              categories
+            );
+            (optOr 0. goal, month, year)
+          }
+        | Calculated _ _ calc goal _ => {
+          let (m, y) = doCalc calc;
+          (goal, m, y) /** TODO */
+        }
         | Sum _ _ (fromRow, toRow) => {
           /* Js.log3 "summing" fromRow toRow; */
-          let total = ref 0.;
+          let goal = ref 0.;
+          let month = ref 0.;
+          let year = ref 0.;
           for i in fromRow to toRow {
-            let next = switch itemsByRow.(i - 1) {
+            let (nextGoal, nextMonth, nextYear) = switch itemsByRow.(i - 1) {
             | Some item => resolve item
-            | None => 0.
+            | None => (0., 0., 0.)
             };
             /* Js.log2 i next; */
-            total := !total +. next;
+            goal := !goal +. nextGoal;
+            month := !month +. nextMonth;
+            year := !year +. nextYear;
+            /* total := !total +. next; */
           };
           /* Js.log2 "Summed" !total; */
-          !total
+          (!goal, !month, !year)
         }
         };
         /* Js.log3 "Finished" value item; */
@@ -227,24 +243,31 @@ let findAmounts items categoryMap => {
       }
     }
   } and doCalc calc => switch calc {
-  | Unit => 0.
-  | Plus one two => doCalc one +. doCalc two
+  | Unit => (0., 0.)
+  | Plus one two => {
+      let (am, ay) = doCalc one;
+      let (bm, by) = doCalc two;
+      (am +. bm, ay +. by);
+  }
   | Minus one two => {
     /* Js.log3 "minus" one two; */
-    let a = doCalc one;
-    let b = doCalc two;
+    let (am, ay) = doCalc one;
+    let (bm, by) = doCalc two;
     /* Js.log4 "was" a b (one, two); */
-    a -. b
+    (am -. bm, ay -. by)
   }
-  | Row at => resolve (force itemsByRow.(at - 1))
+  | Row at => {
+    let (_, m, y) = resolve (force itemsByRow.(at - 1));
+    (m, y)
+  }
   }
   ;
   for i in 0 to (Array.length items - 1) {
     resolve (items.(i)) |> ignore;
   };
   let amounts = Array.map (fun amount => switch amount {
-  | `Unresolved => 0.
-  | `Resolving => 0.
+  | `Unresolved => (0., 0., 0.)
+  | `Resolving => (0., 0., 0.)
   | `Resolved value => value
   })
   amounts;

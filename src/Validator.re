@@ -13,7 +13,7 @@ let make ::budgetData ::transactionData ::render _children => ReasonReact.{
   reducer: fun action _ => ReasonReact.Update action,
   render: fun {state: (year, month), reduce} => {
     let (budgets, warnings) = Budget.parseBudgets budgetData;
-    let (transactions, transactionWarnings, months) = Transactions.parseTransactions year month transactionData;
+    let (categoryMap, transactionWarnings, months) = Transactions.parseTransactions year month transactionData;
 
     <div>
         <div className=Glamor.(css[
@@ -35,7 +35,7 @@ let make ::budgetData ::transactionData ::render _children => ReasonReact.{
         </button>
         </div>
         (spacer 8)
-        {render budgets transactions year month}
+        {render budgets categoryMap year month}
     </div>
   }
 }

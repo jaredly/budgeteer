@@ -11,8 +11,8 @@ type budgetItem =
   | Title string int
   /* name row isYearly categories goal */
   | Item string int bool (array string) (option float)
-  /* name row calc goal */
-  | Calculated string int calc float bool /* flip */
+  /* name row calc goal flip */
+  | Calculated string int calc float bool
   /* name row (fromrow, torow) */
   | Sum string int (int, int);
 

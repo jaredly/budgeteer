@@ -29,13 +29,13 @@ let maybeFlip flip num => flip ? -. num : num;
 let component = ReasonReact.reducerComponent "ReportView";
 /** TODO maybe add state about enabled budget items */
 
-let make ::budgets ::transactions ::year ::month _children => ReasonReact.{
+let make ::budgets ::categoryMap ::year ::month _children => ReasonReact.{
   ...component,
   initialState: fun () => None,
   reducer: fun action _ => ReasonReact.Update action,
   render: fun {state, reduce} => {
     let budget = Budget.latestBudget budgets year month;
-    let amounts = try (Some (Budget.findAmounts budget.items transactions)) {
+    let amounts = try (Some (Budget.findAmounts budget.items categoryMap)) {
     | err => {Js.log err; None}
     };
     [%guard let Some amounts = amounts][@else <div>(str "Errored")</div>];
@@ -61,40 +61,57 @@ let make ::budgets ::transactions ::year ::month _children => ReasonReact.{
             let key = string_of_int (Budget.row item);
             let row = switch item {
             | Title name row => <tr key> <td className=Styles.title>(str name)</td> </tr>
-            | Item name row _ categories goal => <tr
-                key
-                onClick=(reduce (fun _ => state == Some (item, categories) ? None : Some (item, categories)))
-                className=Glamor.(css[
-                  cursor "pointer",
-                  Selector ":hover" [
-                    backgroundColor "#fafafa",
-                  ],
-                ])
-              >
-                <td className=Styles.name> (str name)  </td>
-                <td className=Styles.goal> (str (goal |> optMap dollars |> optOr "")) </td>
-                <td className=Styles.actual> (str (dollars amounts.(row))) </td>
-                {
-                  let amount = goal |> optMap (fun n => n -. amounts.(row));
-                  let className = switch amount { | None => "" | Some x when x >= 0. => Styles.goodDiff | _ => Styles.badDiff };
-                  <td className> (str (amount |> optMap dollars |> optOr "")) </td>
-                }
+            | Item name row isYearly categories goal => {
+                let (g, m, y) = amounts.(row);
+                <tr
+                  key
+                  onClick=(reduce (fun _ => state == Some (item, categories) ? None : Some (item, categories)))
+                  className=Glamor.(css[
+                    cursor "pointer",
+                    Selector ":hover" [
+                      backgroundColor "#fafafa",
+                    ],
+                  ])
+                >
+                  <td className=Styles.name> (str name)  </td>
+                  <td className=Styles.goal> (str (goal |> optMap dollars |> optOr "")) </td>
+                  <td className=Styles.actual> (str (dollars m)) </td>
+                  {
+                    let amount = goal |> optMap (fun n => n -. (isYearly ? y : m));
+                    let className = switch amount { | None => "" | Some x when x >= 0. => Styles.goodDiff | _ => Styles.badDiff };
+                    <td className> (str (amount |> optMap dollars |> optOr "")) </td>
+                  }
+                  <td className=Styles.actual> (str (dollars y)) </td>
                 </tr>
-            | Calculated name row _ goal flip => <tr key>
-                <td className=Styles.calcName> (str name)  </td>
-                <td className=Styles.goal> (str (dollars goal)) </td>
-                <td className=Styles.actual> (str (dollars amounts.(row))) </td>
-                {
-                  let amount = maybeFlip flip @@ goal -. amounts.(row);
-                  let className = amount > 0. ? Styles.goodDiff : Styles.badDiff;
-                  <td className> (str (dollars @@ amount)) </td>
-                }
-              </tr>
-            | Sum name row _ => <tr key>
+              }
+            | Calculated name row _ goal flip => {
+                let (g, m, y) = amounts.(row);
+                <tr key>
+                  <td className=Styles.calcName> (str name)  </td>
+                  <td className=Styles.goal> (str (dollars goal)) </td>
+                  <td className=Styles.actual> (str (dollars m)) </td>
+                  {
+                    let amount = maybeFlip flip @@ goal -. m;
+                    let className = amount > 0. ? Styles.goodDiff : Styles.badDiff;
+                    <td className> (str (dollars @@ amount)) </td>
+                  }
+                  <td className=Styles.actual> (str (dollars y)) </td>
+                </tr>
+              }
+            | Sum name row _ => {
+                let (g, m, y) = amounts.(row);
+                <tr key>
                 <td className=Styles.sumName> (str name)  </td>
-                <td className=Styles.goal> /** TODO the sum of the goals */ </td>
-                <td className=Styles.actual> (str (dollars amounts.(row))) </td>
+                <td className=Styles.goal> (str (dollars g)) </td>
+                <td className=Styles.actual> (str (dollars m)) </td>
+                {
+                    let amount = g -. m;
+                    let className = amount > 0. ? Styles.goodDiff : Styles.badDiff;
+                    <td className> (str (dollars @@ amount)) </td>
+                }
+                <td className=Styles.actual> (str (dollars y)) </td>
                 </tr>
+              }
             };
             switch (state) {
             | Some (i, cat) when i == item => {
@@ -121,7 +138,7 @@ let make ::budgets ::transactions ::year ::month _children => ReasonReact.{
                           <td className=Styles.originalDescription title=tr.originalDescription>(str @@ Js.String.slice from::0 to_::10 tr.originalDescription)</td>
                         </tr>
                       })
-                      (Js.Dict.unsafeGet transactions cat).monthTransactions
+                      (Js.Dict.unsafeGet categoryMap cat).monthTransactions
                       )
                       |> (fun items => [ <tr> <td colSpan=4 className=Glamor.(css[textAlign "center", fontWeight "600"])>(str cat)</td> </tr> , ...items])
                       |> Array.of_list)
@@ -150,9 +167,9 @@ let make ::budgets ::transactions ::year ::month _children => ReasonReact.{
         <h3>(str "Untouched categories")</h3>
         (Array.map
         (fun name => {
-          let cat = (Js.Dict.unsafeGet transactions name);
+          let cat = (Js.Dict.unsafeGet categoryMap name);
           <div>
-          <div>(str name) (str @@ string_of_float cat.monthTotal)</div>
+          <div>(str @@ name ^ " : ") (str @@ string_of_float cat.monthTotal)</div>
           <div className=Glamor.(css[paddingLeft "16px"])>
             (List.map
             (fun tr => {

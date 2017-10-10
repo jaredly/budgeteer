@@ -21,9 +21,9 @@ let make ::token ::name ::email _children => ReasonReact.{
         <Validator
           budgetData
           transactionData
-          render=(fun budgets transactions year month => {
-            Js.log2 budgets transactions;
-            <ReportView budgets transactions year month />
+          render=(fun budgets categoryMap year month => {
+            Js.log2 budgets categoryMap;
+            <ReportView budgets categoryMap year month />
           })
         />
       })
