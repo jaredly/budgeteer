@@ -9,12 +9,12 @@ type calc =
 
 type budgetItem =
   | Title string int
-  /* name row isYearly categories goal */
+        /* name row isYearly categories goal */
   | Item string int bool (array string) (option float)
-  /* name row calc goal flip */
-  | Calculated string int calc float bool
-  /* name row (fromrow, torow) */
-  | Sum string int (int, int);
+              /* name row isYearly calc goal flip */
+  | Calculated string int bool calc float bool
+  /* name row isYearly (fromrow, torow) */
+  | Sum string int bool (int, int);
 
 type budget = {
   startMonth: int,

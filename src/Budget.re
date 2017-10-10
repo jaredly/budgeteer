@@ -116,11 +116,11 @@ let parseBudgets values => {
             | None => warn "Missing goal"
             | Some (JSONString calcGoal) => switch (parseSum calcReport) {
               /** TODO warn if sums are in the wrong columns, or if calcGoal doesn't match */
-              | Some (fromRow, toRow) => add (Sum name row (fromRow, toRow))
+              | Some (fromRow, toRow) => add (Sum name row (getCol colYearly != None) (fromRow, toRow))
               | None => warn "Bad sum"
               }
             | Some (JSONNumber goal) => switch (parseCalc calcReport) {
-              | Some calc => add (Calculated name row calc goal (getCol colFlip !== None))
+              | Some calc => add (Calculated name row (getCol colYearly != None) calc goal (getCol colFlip !== None))
               | None => warn "Bad calc report"
               }
             | _ => ()
@@ -136,7 +136,7 @@ let parseBudgets values => {
         | None => None
         | v => {Js.log v; warn "Bad goal"; None}
         };
-        let isYearly = (getCol colYearly !== None);
+        let isYearly = (getCol colYearly != None);
         add (Item name row isYearly categories goal)
       }
       | _ => ()
@@ -172,8 +172,8 @@ let latestBudget budgets year month => {
 
 let row item => switch item {
 | Title _ num
-| Calculated _ num _ _ _
-| Sum _ num _
+| Calculated _ num _ _ _ _
+| Sum _ num _ _
 | Item _ num _ _ _ => num
 };
 
@@ -213,11 +213,11 @@ let findAmounts items categoryMap => {
             );
             (optOr 0. goal, month, year)
           }
-        | Calculated _ _ calc goal _ => {
+        | Calculated _ _ _ calc goal _ => {
           let (m, y) = doCalc calc;
           (goal, m, y) /** TODO */
         }
-        | Sum _ _ (fromRow, toRow) => {
+        | Sum _ _ _ (fromRow, toRow) => {
           /* Js.log3 "summing" fromRow toRow; */
           let goal = ref 0.;
           let month = ref 0.;

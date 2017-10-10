@@ -44,6 +44,32 @@ let make ::budgets ::categoryMap ::year ::month _children => ReasonReact.{
 
     <div>
       (spacer 32)
+      {Array.length untouched > 0 ?
+        <div>
+        <h3>(str "Untouched categories")</h3>
+        (Array.map
+        (fun name => {
+          let cat = (Js.Dict.unsafeGet categoryMap name);
+          <div>
+          <div>(str @@ name ^ " : ") (str @@ string_of_float cat.monthTotal)</div>
+          <div className=Glamor.(css[paddingLeft "16px"])>
+            (List.map
+            (fun tr => {
+              <div>
+                (str tr.description)
+              </div>
+            })
+            cat.monthTransactions
+            |> Array.of_list
+            |> ReasonReact.arrayToElement)
+          </div>
+        </div>
+        })
+        untouched
+        |> ReasonReact.arrayToElement)
+      </div>
+      : ReasonReact.nullElement
+      }
       <table className=Glamor.(css[borderCollapse "collapse", width "100%"])>
       <thead>
         <tr>
@@ -84,28 +110,28 @@ let make ::budgets ::categoryMap ::year ::month _children => ReasonReact.{
                   <td className=Styles.actual> (str (dollars y)) </td>
                 </tr>
               }
-            | Calculated name row _ goal flip => {
+            | Calculated name row isYearly _ goal flip => {
                 let (g, m, y) = amounts.(row);
                 <tr key>
-                  <td className=Styles.calcName> (str name)  </td>
+                  <td className=Styles.calcName> (str name) </td>
                   <td className=Styles.goal> (str (dollars goal)) </td>
                   <td className=Styles.actual> (str (dollars m)) </td>
                   {
-                    let amount = maybeFlip flip @@ goal -. m;
+                    let amount = maybeFlip flip @@ goal -. (isYearly ? y : m);
                     let className = amount > 0. ? Styles.goodDiff : Styles.badDiff;
                     <td className> (str (dollars @@ amount)) </td>
                   }
                   <td className=Styles.actual> (str (dollars y)) </td>
                 </tr>
               }
-            | Sum name row _ => {
+            | Sum name row isYearly _ => {
                 let (g, m, y) = amounts.(row);
                 <tr key>
                 <td className=Styles.sumName> (str name)  </td>
                 <td className=Styles.goal> (str (dollars g)) </td>
                 <td className=Styles.actual> (str (dollars m)) </td>
                 {
-                    let amount = g -. m;
+                    let amount = g -. (isYearly ? y : m);
                     let className = amount > 0. ? Styles.goodDiff : Styles.badDiff;
                     <td className> (str (dollars @@ amount)) </td>
                 }
@@ -163,29 +189,6 @@ let make ::budgets ::categoryMap ::year ::month _children => ReasonReact.{
         }
       </tbody>
       </table>
-      <div>
-        <h3>(str "Untouched categories")</h3>
-        (Array.map
-        (fun name => {
-          let cat = (Js.Dict.unsafeGet categoryMap name);
-          <div>
-          <div>(str @@ name ^ " : ") (str @@ string_of_float cat.monthTotal)</div>
-          <div className=Glamor.(css[paddingLeft "16px"])>
-            (List.map
-            (fun tr => {
-              <div>
-                (str tr.description)
-              </div>
-            })
-            cat.monthTransactions
-            |> Array.of_list
-            |> ReasonReact.arrayToElement)
-          </div>
-        </div>
-        })
-        untouched
-        |> ReasonReact.arrayToElement)
-      </div>
     </div>
   }
 };
