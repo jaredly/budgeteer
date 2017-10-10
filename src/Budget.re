@@ -83,9 +83,10 @@ let parseBudgets values => {
 
     let colCategories = off;
     let colYearly = off + 1;
-    let colName = off + 2;
-    let colGoal = off + 3;
-    let colReport = off + 4;
+    let colFlip = off + 2;
+    let colName = off + 3;
+    let colGoal = off + 4;
+    let colReport = off + 5;
     let colStartMonth = off + 1;
     let colStartYear = off + 2;
 
@@ -119,7 +120,7 @@ let parseBudgets values => {
               | None => warn "Bad sum"
               }
             | Some (JSONNumber goal) => switch (parseCalc calcReport) {
-              | Some calc => add (Calculated name row calc goal)
+              | Some calc => add (Calculated name row calc goal (getCol colFlip !== None))
               | None => warn "Bad calc report"
               }
             | _ => ()
@@ -171,7 +172,7 @@ let latestBudget budgets year month => {
 
 let row item => switch item {
 | Title _ num
-| Calculated _ num _ _
+| Calculated _ num _ _ _
 | Sum _ num _
 | Item _ num _ _ _ => num
 };
@@ -204,7 +205,7 @@ let findAmounts items categoryMap => {
             })
             0.
             categories)
-        | Calculated _ _ calc _ => doCalc calc
+        | Calculated _ _ calc _ _ => doCalc calc
         | Sum _ _ (fromRow, toRow) => {
           /* Js.log3 "summing" fromRow toRow; */
           let total = ref 0.;
@@ -229,10 +230,10 @@ let findAmounts items categoryMap => {
   | Unit => 0.
   | Plus one two => doCalc one +. doCalc two
   | Minus one two => {
-    Js.log3 "minus" one two;
+    /* Js.log3 "minus" one two; */
     let a = doCalc one;
     let b = doCalc two;
-    Js.log4 "was" a b (one, two);
+    /* Js.log4 "was" a b (one, two); */
     a -. b
   }
   | Row at => resolve (force itemsByRow.(at - 1))

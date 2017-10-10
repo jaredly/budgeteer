@@ -15,9 +15,13 @@ let getString item => switch item {
 | _ => None
 };
 
-let parseDate num => {
+let serialDate num => {
   let utcSeconds = floor (num -. 25568.) *. 86400.;
-  let date = Js.Date.fromFloat (utcSeconds *. 1000.);
+  Js.Date.fromFloat (utcSeconds *. 1000.);
+};
+
+let parseDate num => {
+  let date = serialDate num;
   (Js.Date.getFullYear date |> int_of_float, Js.Date.getMonth date |> int_of_float)
 };
 
