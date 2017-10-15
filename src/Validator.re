@@ -16,14 +16,14 @@ let make ::budgetData ::transactionData ::render _children => ReasonReact.{
     let (categoryMap, transactionWarnings, months) = Transactions.parseTransactions year month transactionData;
 
     <div>
-        <div className=Glamor.(css[
+        (warnings !== [] && transactionWarnings !== [] ? <div className=Glamor.(css[
           padding "8px 16px",
           backgroundColor "#eee",
         ])>
           (str "Warnings:")
           (List.map str warnings |> Array.of_list |> ReasonReact.arrayToElement)
           (List.map str transactionWarnings |> Array.of_list |> ReasonReact.arrayToElement)
-        </div>
+        </div> : ReasonReact.nullElement)
         (spacer 16)
         <div className=Glamor.(css[flexDirection "row", justifyContent "center"])>
         <button onClick=(reduce (fun _ => month === 0 ? (year - 1, 11) : (year, month - 1)))>

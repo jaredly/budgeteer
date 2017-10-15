@@ -72,14 +72,14 @@ let parseBudgets values => {
   let warnings = ref [];
   let warn warning => warnings := [warning, ...!warnings];
   /** 5 columns and a space between */
-  let numBudgets = (Array.length values.(0) + 3) / 6;
+  let numBudgets = (Array.length values.(0) + 4) / 7;
   Js.log numBudgets;
   Js.log values;
-  Js.log (Array.length values.(0) + 3);
+  Js.log (Array.length values.(0) + 4);
 
 
   for i in 0 to (numBudgets - 1) {
-    let off = i * 6;
+    let off = i * 7;
 
     let colCategories = off;
     let colYearly = off + 1;
@@ -153,21 +153,27 @@ let parseBudgets values => {
   (!budgets, !warnings)
 };
 
+let isBefore a b => {
+  a.startYear < b.startYear || (a.startYear === b.startYear && a.startMonth < b.startMonth)
+};
+
 let latestBudget budgets year month => {
-  switch budgets {
-  | [] => failwith "No budgets"
-  | [first, ...rest] =>
-    List.fold_left
-    (fun current next => {
-      if (next.startYear !== year || next.startMonth > month) {
-        current
+  List.fold_left
+  (fun current next => {
+    let isValid = next.startYear < year || (next.startYear === year && next.startMonth <= (month + 1));
+    if (not isValid) {
+      current
+    } else {
+      [%guard let Some budget = current][@else Some next];
+      if (isBefore budget next) {
+        Some next
       } else {
-        next
+        Some budget
       }
-    })
-    first
-    rest
-  }
+    }
+  })
+  None
+  budgets
 };
 
 let row item => switch item {

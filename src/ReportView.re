@@ -34,19 +34,19 @@ let make ::budgets ::categoryMap ::year ::month _children => ReasonReact.{
   initialState: fun () => None,
   reducer: fun action _ => ReasonReact.Update action,
   render: fun {state, reduce} => {
-    let budget = Budget.latestBudget budgets year month;
+    [%guard let Some budget = Budget.latestBudget budgets year month][@else failwith "No budget to be found"];
     let amounts = try (Some (Budget.findAmounts budget.items categoryMap)) {
     | err => {Js.log err; None}
     };
     [%guard let Some amounts = amounts][@else <div>(str "Errored")</div>];
     let (amounts, untouched) = amounts;
-    Js.log amounts;
+    /* Js.log amounts; */
 
     <div>
       (spacer 32)
       {Array.length untouched > 0 ?
         <div>
-        <h3>(str "Untouched categories")</h3>
+        <h3>(str "Non-organized categories")</h3>
         (Array.map
         (fun name => {
           let cat = (Js.Dict.unsafeGet categoryMap name);
@@ -67,6 +67,7 @@ let make ::budgets ::categoryMap ::year ::month _children => ReasonReact.{
         })
         untouched
         |> ReasonReact.arrayToElement)
+        (spacer 32)
       </div>
       : ReasonReact.nullElement
       }
@@ -89,6 +90,15 @@ let make ::budgets ::categoryMap ::year ::month _children => ReasonReact.{
             | Title name row => <tr key> <td className=Styles.title>(str name)</td> </tr>
             | Item name row isYearly categories goal => {
                 let (g, m, y) = amounts.(row);
+                let totalItems = Array.fold_left
+                (fun total cat => {
+                  total + (
+                    (Js.Dict.get categoryMap cat)
+                    |> optMap (fun a => List.length a.monthTransactions)
+                    |> optOr 0
+                  )
+                }) 0 categories;
+
                 <tr
                   key
                   onClick=(reduce (fun _ => state == Some (item, categories) ? None : Some (item, categories)))
@@ -99,7 +109,15 @@ let make ::budgets ::categoryMap ::year ::month _children => ReasonReact.{
                     ],
                   ])
                 >
-                  <td className=Styles.name> (str name)  </td>
+                  <td className=Styles.name>
+                    <div className=Glamor.(css[flexDirection "row"])>
+                      (str name)
+                      spring
+                      <div>
+                        (str (string_of_int totalItems))
+                      </div>
+                    </div>
+                  </td>
                   <td className=Styles.goal> (str (goal |> optMap dollars |> optOr "")) </td>
                   <td className=Styles.actual> (str (dollars m)) </td>
                   {
@@ -164,7 +182,7 @@ let make ::budgets ::categoryMap ::year ::month _children => ReasonReact.{
                           <td className=Styles.originalDescription title=tr.originalDescription>(str @@ Js.String.slice from::0 to_::10 tr.originalDescription)</td>
                         </tr>
                       })
-                      (Js.Dict.unsafeGet categoryMap cat).monthTransactions
+                      ((Js.Dict.get categoryMap cat) |> optMap (fun a => a.monthTransactions) |> optOr [])
                       )
                       |> (fun items => [ <tr> <td colSpan=4 className=Glamor.(css[textAlign "center", fontWeight "600"])>(str cat)</td> </tr> , ...items])
                       |> Array.of_list)
