@@ -60,6 +60,12 @@ let module Form = {
   let make ::loading ::onSubmit _children => ReasonReact.{
     ...component,
     initialState: fun () => parseFromLocation (),
+    didMount: fun {state: {spreadsheet, budgets, transactions} as state} => {
+      if (spreadsheet !== "" && budgets !== "" && transactions !== "") {
+        onSubmit state
+      };
+      ReasonReact.NoUpdate
+    },
     reducer: fun action _ => ReasonReact.Update action,
     render: fun {state: {spreadsheet, budgets, transactions}, reduce} => {
       <div className=Styles.form>
@@ -107,7 +113,7 @@ type state =
   | Initial
   | Loading
   | Error Js.Promise.error
-  | Success (array (array Js.Json.t), array (array Js.Json.t))
+  | Success (array (array Js.Json.t), array (array Js.Json.t), string)
   ;
 
 let component = ReasonReact.reducerComponent "DataLoader";
@@ -127,7 +133,7 @@ let make ::accessToken ::render _children => ReasonReact.{
         |> Js.Promise.then_ (fun (budgetData, transactionData) => {
           /* Sheet.setItem "budgetData" (Js.Json.stringifyAny budgetData); */
           /* Sheet.setItem "transactionData" (Js.Json.stringifyAny budgetData); */
-          (reduce (fun _ => Success (budgetData, transactionData))) ();
+          (reduce (fun _ => Success (budgetData, transactionData, spreadsheet))) ();
           Js.Promise.resolve ()
         })
         |> Js.Promise.catch (fun err => {
@@ -141,8 +147,15 @@ let make ::accessToken ::render _children => ReasonReact.{
       | Initial => <div>(str "Fill in the form")</div>
       | Loading => <div>(str "Loading...")</div>
       | Error err => <div>(str "Failed")</div>
-      | Success (budgetData, transactionData) => {
-        render (budgetData, transactionData)
+      | Success (budgetData, transactionData, spreadsheetId) => {
+        <div>
+          <a
+            href=("https://docs.google.com/spreadsheets/d/" ^ spreadsheetId ^ "/edit")
+            target="_blank"
+          >(str "Spreadsheet")</a>
+          (spacer 16)
+          (render (budgetData, transactionData))
+        </div>
       }
       }}
     </div>
