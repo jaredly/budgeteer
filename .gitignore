@@ -3,3 +3,4 @@ node_modules
 .merlin
 npm-debug.logconfig.js
 public/bundle.js
+.bsb.lock
