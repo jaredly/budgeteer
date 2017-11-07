@@ -16,6 +16,13 @@ let promise = (prom) =>
 
 [@bs.val] [@bs.scope "gapi"] external load : ([@bs.as "auth2"] _, unit => unit) => unit = "load";
 
+/* type window;
+type yolo;
+[@bs.set] external load : (window, (yolo) => unit) => unit = "onGoogleYoloLoad";
+[@bs.val] external window: window = "";
+
+let load = (onLoad) => load(window, onLoad); */
+
 type gapi;
 
 [@bs.val] external gapi : gapi = "";
