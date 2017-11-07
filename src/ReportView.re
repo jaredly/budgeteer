@@ -91,7 +91,7 @@ let module OptionButtons = {
 
 let renderTransactionRow = (~key, ~cat, ~categoryMap, ~ly, ~onChangeLy, ~currentYear, ~currentMonth) => {
   <tr key=(key ++ "list")>
-    <td className=Glamor.(css([])) colSpan=5>
+    <td className=Glamor.(css([])) colSpan=8>
       <div
       >
         <OptionButtons
