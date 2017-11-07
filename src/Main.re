@@ -15,16 +15,7 @@ let signIn = () => {
          } else {
            Js.Promise.make((~resolve, ~reject) => {
             ReactDOMRe.renderToElementWithId(<button
-              className=Glamor.(css([
-                width("200px"),
-                padding("8px 24px"),
-                backgroundColor("white"),
-                margin("64px"),
-                alignSelf("center"),
-                border("1px solid #aaa"),
-                borderRadius("8px"),
-                cursor("pointer")
-              ]))
+              className=App.buttonStyle
               onClick=((_) => {
                 Auth.signIn(auth)
                 |> Js.Promise.then_((user) => {

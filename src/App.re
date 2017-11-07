@@ -2,6 +2,18 @@ let component = ReasonReact.statelessComponent("App");
 
 let str = ReasonReact.stringToElement;
 
+let buttonStyle = Glamor.(css([
+          /* width("100px"), */
+          position("absolute"),
+          top("16px"),
+          left("16px"),
+          padding("8px 24px"),
+          backgroundColor("white"),
+          border("1px solid #aaa"),
+          borderRadius("8px"),
+          cursor("pointer")
+        ]));
+
 let make = (~token, ~name, ~email, _children) =>
   ReasonReact.{
     ...component,
@@ -24,23 +36,13 @@ let make = (~token, ~name, ~email, _children) =>
         )
       />
       <button
-        className=Glamor.(css([
-          width("100px"),
-          padding("8px 24px"),
-          position("absolute"),
-          top("16px"),
-          left("16px"),
-          backgroundColor("white"),
-          border("1px solid #aaa"),
-          borderRadius("8px"),
-          cursor("pointer")
-        ]))
+        className=buttonStyle
       onClick=((_) => {
         [%bs.raw "(gapi.auth2.getAuthInstance().signOut(),location.reload())"]
         /* Auth.signOut(auth); */
       })
       >
-      (Utils.str("Sign out"))
+      (Utils.str("Sign out " ++ email))
       </button>
       </div>
   };

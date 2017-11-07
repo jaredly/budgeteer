@@ -47,21 +47,26 @@ let parseTransactions = (currentYear, currentMonth, data) => {
       switch (Js.Dict.get(categories, transaction.category)) {
       | None => {
           name: transaction.category,
-          monthTotal: 0.,
+          byMonth: IntPairMap.empty,
+          /* monthTotal: 0.,
           yearTotal: 0.,
           yearTransactions: [],
-          monthTransactions: []
+          monthTransactions: [] */
         }
       | Some(cat) => cat
       };
+    let key = (transaction.year, transaction.month);
+    let (total, items) = IntPairMap.mem(key, cat.byMonth) ? IntPairMap.find(key, cat.byMonth) : (0.0, []);
+    let current = (total +. transaction.amount, [transaction, ...items]);
     let cat = {
       ...cat,
-      monthTotal: (transaction.month === currentMonth ? transaction.amount : 0.) +. cat.monthTotal,
+      byMonth: IntPairMap.add(key, current, cat.byMonth)
+      /* monthTotal: (transaction.month === currentMonth ? transaction.amount : 0.) +. cat.monthTotal,
       yearTotal: cat.yearTotal +. transaction.amount,
       yearTransactions: [transaction, ...cat.yearTransactions],
       monthTransactions:
         transaction.month === currentMonth ?
-          [transaction, ...cat.monthTransactions] : cat.monthTransactions
+          [transaction, ...cat.monthTransactions] : cat.monthTransactions */
     };
     Js.Dict.set(categories, transaction.category, cat)
   };

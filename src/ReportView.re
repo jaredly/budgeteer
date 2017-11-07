@@ -26,7 +26,6 @@ let maybeFlip = (flip, num) => flip ? -. num : num;
 type ly = Yearly|Monthly;
 let component = ReasonReact.reducerComponent("ReportView");
 
-
 let renderTransaction = (tr) => {
   <tr>
     <td className=Styles.date>
@@ -53,9 +52,53 @@ let renderTransaction = (tr) => {
   </tr>
 };
 
-let renderTransactionRow = (~key, ~cat, ~categoryMap, ~ly) => {
+let module OptionButtons = {
+  let shared = Glamor.([
+    padding("4px 8px"),
+    border("1px solid #eee"),
+    borderRadius("8px"),
+    cursor("pointer")
+  ]);
+  let selected = Glamor.(css([
+    backgroundColor("#aaa"),
+    ...shared
+  ]));
+  let unselected = Glamor.(css([
+    backgroundColor("white"),
+    ...shared
+  ]));
+
+  let component = ReasonReact.statelessComponent("OptionButtons");
+  let make = (~current, ~options, ~onChange, _) => {
+    ...component,
+    render: (_) => {
+      <div className=Glamor.(css([flexDirection("row"), justifyContent("center")]))>
+        (List.map(
+        (((value, title)) => {
+          <div onClick=((_) => onChange(value))
+            className=(value == current ? selected : unselected)
+          >
+            (str(title))
+          </div>
+        }), options)
+        |> Array.of_list
+        |> ReasonReact.arrayToElement)
+      </div>
+    }
+  };
+};
+
+let renderTransactionRow = (~key, ~cat, ~categoryMap, ~ly, ~onChangeLy, ~currentYear, ~currentMonth) => {
   <tr key=(key ++ "list")>
-    <td className=Glamor.(css([padding("16px")])) colSpan=5>
+    <td className=Glamor.(css([])) colSpan=5>
+      <div
+      >
+        <OptionButtons
+          current=ly
+          options=[(Monthly, "This Month"), (Yearly, "YTD")]
+          onChange=onChangeLy
+        />
+      </div>
       <div className=Glamor.(css([padding("16px"), border("3px solid #eee")]))>
         <table className=Glamor.(css([width("100%")]))>
             <tbody>
@@ -66,7 +109,7 @@ let renderTransactionRow = (~key, ~cat, ~categoryMap, ~ly) => {
                       (tr) =>
                         renderTransaction(tr),
                       Js.Dict.get(categoryMap, cat)
-                      |> optMap((a) => ly === Yearly ? a.yearTransactions : a.monthTransactions)
+                      |> optMap((a) => ly === Yearly ? Cat.ytdTransactions(a, currentYear, currentMonth) : Cat.transactions(a, (currentYear, currentMonth)))
                       |> optOr([])
                     )
                     |> (
@@ -96,7 +139,7 @@ let renderTransactionRow = (~key, ~cat, ~categoryMap, ~ly) => {
   </tr>;
 };
 
-let renderUntouched = (~untouched, ~categoryMap) => {
+let renderUntouched = (~untouched, ~categoryMap, ~year, ~month) => {
   <div>
     <h3> (str("Non-organized categories")) </h3>
     (
@@ -104,10 +147,10 @@ let renderUntouched = (~untouched, ~categoryMap) => {
         (name) => {
           let cat = Js.Dict.unsafeGet(categoryMap, name);
           <div>
-            <div> (str @@ name ++ " : ") (str @@ string_of_float(cat.monthTotal)) </div>
+            <div> (str @@ name ++ " : ") (str @@ string_of_float(Cat.total(cat, (year, month)))) </div>
             <div className=Glamor.(css([paddingLeft("16px")]))>
               (
-                List.map((tr) => <div> (str(tr.description)) </div>, cat.monthTransactions)
+                List.map((tr) => <div> (str(tr.description)) </div>, Cat.transactions(cat, (year, month)))
                 |> Array.of_list
                 |> ReasonReact.arrayToElement
               )
@@ -122,17 +165,17 @@ let renderUntouched = (~untouched, ~categoryMap) => {
   </div>
 };
 
-let renderItem = (~amounts, ~row, ~item, ~categories, ~categoryMap, ~key, ~reduce, ~name, ~goal, ~isYearly, ~state) => {
-  let (g, m, y) = amounts[row];
+let renderItem = (~m, ~y, ~item, ~categories, ~categoryMap, ~key, ~reduce, ~name, ~goal, ~isYearly, ~state, ~year, ~month) => {
   let monthSelected = state == Some((item, categories, Monthly));
   let yearSelected = state == Some((item, categories, Yearly));
+  let isSelected = monthSelected || yearSelected;
   let totalItems =
     Array.fold_left(
       (total, cat) =>
         total
         + (
           Js.Dict.get(categoryMap, cat)
-          |> optMap((a) => List.length(a.monthTransactions))
+          |> optMap((a) => List.length(Cat.transactions(a, (year, month))))
           |> optOr(0)
         ),
       0,
@@ -142,7 +185,7 @@ let renderItem = (~amounts, ~row, ~item, ~categories, ~categoryMap, ~key, ~reduc
     key
     onClick=(
       reduce(
-        (_) => monthSelected ? None : Some((item, categories, Monthly))
+        (_) => isSelected ? None : Some((item, categories, Monthly))
       )
     )
     className=Glamor.(
@@ -179,7 +222,7 @@ let renderItem = (~amounts, ~row, ~item, ~categories, ~categoryMap, ~key, ~reduc
       reduce(
         (evt) => {
           ReactEventRe.Mouse.stopPropagation(evt);
-          state == Some((item, categories, Yearly))
+          isSelected
             ? None
             : Some((item, categories, Yearly))
         }
@@ -200,7 +243,7 @@ let make = (~budgets, ~categoryMap, ~year, ~month, _children) =>
       [@else failwith("No budget to be found")]
       [%guard let Some(budget) = Budget.latestBudget(budgets, year, month)];
       let amounts =
-        try (Some(Budget.findAmounts(budget.items, categoryMap))) {
+        try (Some(Budget.findAmounts(~currentYear=year, ~currentMonth=month, budget.items, categoryMap))) {
         | err =>
           Js.log(err);
           None
@@ -212,7 +255,7 @@ let make = (~budgets, ~categoryMap, ~year, ~month, _children) =>
         (spacer(32))
         (
           Array.length(untouched) > 0 ?
-            renderUntouched(~untouched, ~categoryMap) :
+            renderUntouched(~untouched, ~categoryMap, ~year, ~month) :
             ReasonReact.nullElement
         )
         <table className=Glamor.(css([borderCollapse("collapse"), width("100%")]))>
@@ -234,8 +277,10 @@ let make = (~budgets, ~categoryMap, ~year, ~month, _children) =>
                     switch item {
                     | Title(name, row) =>
                       <tr key> <td className=Styles.title> (str(name)) </td> </tr>
-                    | Item(name, row, isYearly, categories, goal) =>
-                      renderItem(~amounts, ~row, ~item, ~categories, ~categoryMap, ~key, ~reduce, ~name, ~goal, ~isYearly, ~state)
+                    | Item(name, row, isYearly, categories, goal) => {
+                      let (_, m, y) = amounts[row];
+                      renderItem(~m, ~y, ~item, ~categories, ~categoryMap, ~key, ~reduce, ~name, ~goal, ~isYearly, ~state, ~year, ~month)
+                    }
                     | Calculated(name, row, isYearly, _, goal, flip) =>
                       let (g, m, y) = amounts[row];
                       <tr key className=Styles.calcName>
@@ -265,7 +310,11 @@ let make = (~budgets, ~categoryMap, ~year, ~month, _children) =>
                     };
                   switch state {
                   | Some((i, cat, ly)) when i == item =>
-                    let transactionRow = renderTransactionRow(~key, ~cat, ~categoryMap, ~ly);
+                    let transactionRow = renderTransactionRow(~key, ~cat, ~categoryMap, ~ly,
+                      ~onChangeLy=((value) => reduce(() => Some((i, cat, value)))()),
+                      ~currentYear=year,
+                      ~currentMonth=month
+                    );
                     [|row, transactionRow|]
                   | _ => [|row|]
                   }

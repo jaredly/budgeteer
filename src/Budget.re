@@ -197,8 +197,11 @@ let parseBudgets = (values) => {
   (budgets^, warnings^)
 };
 
-let isBefore = (a, b) =>
-  a.startYear < b.startYear || a.startYear === b.startYear && a.startMonth < b.startMonth;
+let isBefore = (a, b) => {
+  (a.startYear < b.startYear)
+  || a.startYear === b.startYear
+  && a.startMonth < b.startMonth;
+};
 
 let latestBudget = (budgets, year, month) =>
   List.fold_left(
@@ -234,7 +237,7 @@ let force = (opt) =>
   | None => failwith("Forced a none")
   };
 
-module StringSet =
+let module StringSet =
   Set.Make(
     {
       type t = string;
@@ -242,12 +245,33 @@ module StringSet =
     }
   );
 
-/* type calcState = Unresolved | Resolving | Resolved float; */
-let findAmounts = (items, categoryMap) => {
+let resolveCategories = (~touchedCategories, ~currentYear, ~currentMonth, ~categories, ~categoryMap) => {
+  Array.fold_left(
+    ((month, year), category) => {
+      touchedCategories := StringSet.add(category, touchedCategories^);
+      let (ytd, thisMonth) = Js.Dict.get(categoryMap, category)
+      |> Utils.optMap((cat) => {
+      (
+        Cat.ytd(cat, currentYear, currentMonth),
+        Cat.total(cat, (currentYear, currentMonth))
+      )
+      }) |> Utils.optOr((0., 0.));
+      (
+        month +. thisMonth,
+        year +. ytd
+      )
+    },
+    (0., 0.),
+    categories
+  );
+};
+
+let findAmounts = (~currentYear, ~currentMonth, items, categoryMap) => {
   let maxRow = Array.fold_left((num, item) => max(num, row(item)), 0, items);
   let amounts = Array.make(maxRow + 1, `Unresolved);
   let itemsByRow = Array.make(maxRow + 1, None);
   let touchedCategories = ref(StringSet.empty);
+  let resolveCategories = resolveCategories(~touchedCategories, ~currentYear, ~currentMonth, ~categoryMap);
   Array.iter((item) => itemsByRow[row(item)] = Some(item), items);
   let rec resolve = (item) => {
     let thisRow = row(item);
@@ -255,25 +279,12 @@ let findAmounts = (items, categoryMap) => {
     | `Resolved(goal, month, year) => (goal, month, year)
     | `Resolving => failwith("Recursive definition")
     | `Unresolved =>
-      /* Js.log3 thisRow item amounts.(thisRow); */
       amounts[thisRow] = `Resolving;
       let value =
         switch item {
         | Title(_) => (0., 0., 0.)
         | Item(_, _, _, categories, goal) =>
-          let (month, year) =
-            Array.fold_left(
-              ((month, year), category) => {
-                touchedCategories := StringSet.add(category, touchedCategories^);
-                let catVal = Js.Dict.get(categoryMap, category);
-                (
-                  month +. (catVal |> optMap((c) => c.monthTotal) |> optOr(0.)),
-                  year +. (catVal |> optMap((c) => c.yearTotal) |> optOr(0.))
-                )
-              },
-              (0., 0.),
-              categories
-            );
+          let (month, year) = resolveCategories(~categories);
           (optOr(0., goal), month, year)
         | Calculated(_, _, _, calc, goal, _) =>
           let (m, y) = doCalc(calc);
@@ -339,7 +350,9 @@ let findAmounts = (items, categoryMap) => {
     |> Js.Array.filter(
          (cat) =>
            ! StringSet.mem(cat, touchedCategories^)
-           && Js.Dict.unsafeGet(categoryMap, cat).monthTotal > 0.
+           && Cat.fromMap(categoryMap, cat, (currentYear, currentMonth)) > 0.
        );
   (amounts, untouched)
 };
+
+/* let makeReport = (~budgets, ~categoryMap) */

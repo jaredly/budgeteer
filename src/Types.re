@@ -38,10 +38,47 @@ type transaction = {
   notes: option(string)
 };
 
+/* let module IntMap = Map.Make {type t = int; let compare = compare }; */
+let module IntPairMap = Map.Make {type t = (int, int); let compare = compare };
+
 type category = {
   name: string,
-  monthTotal: float,
-  yearTotal: float,
+  byMonth: IntPairMap.t ((float, list(transaction)))
+};
+  /* monthTotal: float,
+  yearTotal: float, */
+  /* totalsByMonth: IntPairMap.t float,
+  totalsByYear: IntMap.t float,
   monthTransactions: list(transaction),
-  yearTransactions: list(transaction)
+  yearTransactions: list(transaction) */
+
+let module Cat = {
+  let total = (cat, key) => IntPairMap.mem(key, cat.byMonth) ? (IntPairMap.find(key, cat.byMonth) |> fst) : 0.;
+  let transactions = (cat, key) => IntPairMap.mem(key, cat.byMonth) ? (IntPairMap.find(key, cat.byMonth) |> snd) : [];
+
+  let fromMap = (catMap, cat, key) => Js.Dict.get(catMap, cat)
+        |> Utils.optMap((cat) => total(cat, key))
+        |> Utils.optOr(0.);
+
+  let transactionsFromMap = (catMap, cat, key) => Js.Dict.get(catMap, cat)
+        |> Utils.optMap((cat) => transactions(cat, key))
+        |> Utils.optOr([]);
+
+  let ytd = (cat, year, month) => {
+    let res = ref(0.);
+    for (i in 0 to month) {
+      let v = total(cat, (year, i));
+      res := res^ +. v;
+    };
+    res^
+  };
+
+  let ytdTransactions = (cat, year, month) => {
+    let total = ref([]);
+    for (i in 0 to month) {
+      let v = transactions(cat, (year, i));
+      total := total^ @ v;
+    };
+    total^
+  };
 };
