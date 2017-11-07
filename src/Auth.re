@@ -1,37 +1,55 @@
+type googlePromise('a) = Js.Promise.t('a);
 
-type googlePromise 'a = Js.Promise.t 'a;
+[@bs.send]
+external handle : (googlePromise('a), 'a => 'b, Js.Promise.error => 'b) => Js.Promise.t('b) =
+  "then";
 
-external handle: googlePromise 'a => ('a => 'b) => (Js.Promise.error => 'b) => Js.Promise.t 'b = "then" [@@bs.send];
-external newPromise: (('a => unit) => (Js.Promise.error => unit) => unit) => Js.Promise.t 'a = "Promise" [@@bs.new];
-let promise prom => newPromise (fun resolve reject => handle prom (fun value => resolve {"value": value}) (fun err => reject err) |> ignore);
+[@bs.new]
+external newPromise : (('a => unit, Js.Promise.error => unit) => unit) => Js.Promise.t('a) =
+  "Promise";
 
-external load: (_ [@bs.as "auth2"]) => (unit => unit) => unit = "load" [@@bs.val] [@@bs.scope "gapi"];
+let promise = (prom) =>
+  newPromise(
+    (resolve, reject) =>
+      handle(prom, (value) => resolve({"value": value}), (err) => reject(err)) |> ignore
+  );
+
+[@bs.val] [@bs.scope "gapi"] external load : ([@bs.as "auth2"] _, unit => unit) => unit = "load";
 
 type gapi;
-external gapi: gapi = "" [@@bs.val];
+
+[@bs.val] external gapi : gapi = "";
 
 type auth2;
-external auth2: gapi => auth2 = "auth2" [@@bs.get];
+
+[@bs.get] external auth2 : gapi => auth2 = "auth2";
 
 type authInst;
-external init: auth2 => Js.t {.
-  client_id: string,
-  scope: string
-} => googlePromise authInst = "" [@@bs.send];
-let init config => init (auth2 gapi) config |> promise;
 
-external isSignedIn: authInst => bool = "get" [@@bs.send] [@@bs.scope "isSignedIn"];
+[@bs.send]
+external init : (auth2, {. "client_id": string, "scope": string}) => googlePromise(authInst) =
+  "";
+
+let init = (config) => init(auth2(gapi), config) |> promise;
+
+[@bs.send] [@bs.scope "isSignedIn"] external isSignedIn : authInst => bool = "get";
 
 type user;
-external signIn: authInst => Js.Promise.t user = "" [@@bs.send];
-external currentUser: authInst => user = "get" [@@bs.send] [@@bs.scope "currentUser"];
+
+[@bs.send] external signIn : authInst => Js.Promise.t(user) = "";
+
+[@bs.send] [@bs.scope "currentUser"] external currentUser : authInst => user = "get";
 
 type profile;
-external getBasicProfile: user => profile = "" [@@bs.send];
-external getName: profile => string = "" [@@bs.send];
-external getEmail: profile => string = "" [@@bs.send];
 
-type authResponse = Js.t {.access_token: string};
-external getAuthResponse: user => authResponse = "" [@@bs.send];
+[@bs.send] external getBasicProfile : user => profile = "";
 
-let token user => (getAuthResponse user)##access_token;
+[@bs.send] external getName : profile => string = "";
+
+[@bs.send] external getEmail : profile => string = "";
+
+type authResponse = {. "access_token": string};
+
+[@bs.send] external getAuthResponse : user => authResponse = "";
+
+let token = (user) => getAuthResponse(user)##access_token;

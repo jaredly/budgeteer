@@ -5,6 +5,7 @@
 {
   "name" : "budgeteer",
   "reason" : {"react-jsx" : 2},
+  "refmt": 3,
   "bsc-flags": ["-bs-super-errors"],
   "bs-dependencies": ["reason-react", "bs-glamor"],
   "sources": [{ "dir": "src", "subdirs": [] }],

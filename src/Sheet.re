@@ -1,30 +1,35 @@
-
-type config = Js.t {.
-  clientId: string,
-  scope: string
-};
+type config = {. "clientId": string, "scope": string};
 
 type window;
 
-external window: window = "" [@@bs.val];
-external onSignIn: window => (Auth.user => unit) => unit = "" [@@bs.set];
-let onSignIn = onSignIn window;
+[@bs.val] external window : window = "";
 
-type response 't;
-external json: response 't => Js.Promise.t 't = "" [@@bs.send];
-external fetch: string => Js.t {..headers: Js.t{..}} => Js.Promise.t 't = "" [@@bs.val];
+[@bs.set] external onSignIn : (window, Auth.user => unit) => unit = "";
 
-let fetchGet url accessToken => fetch url {"headers": {"Authorization": "Bearer " ^ accessToken}};
+let onSignIn = onSignIn(window);
 
-type valuesResponse = Js.t {.
-  values: array (array Js.Json.t),
-  range: string,
-  majorDimension: string
+type response('t);
+
+[@bs.send] external json : response('t) => Js.Promise.t('t) = "";
+
+[@bs.val] external fetch : (string, {.. "headers": Js.t({..})}) => Js.Promise.t('t) = "";
+
+let fetchGet = (url, accessToken) =>
+  fetch(url, {"headers": {"Authorization": "Bearer " ++ accessToken}});
+
+type valuesResponse = {
+  .
+  "values": array(array(Js.Json.t)), "range": string, "majorDimension": string
 };
-let values sheetId range accessToken => fetchGet {j|https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/$range?valueRenderOption=FORMULA|j} accessToken
-  |> Js.Promise.then_ json
-  |> Js.Promise.then_ (fun (data: valuesResponse) => data##values |> Js.Promise.resolve);
 
-external setItem: string => 'a => unit = "" [@@bs.val] [@@bs.scope "localStorage"];
-external getItem: string => Js.nullable 'a = "" [@@bs.val] [@@bs.scope "localStorage"];
+let values = (sheetId, range, accessToken) =>
+  fetchGet(
+    {j|https://sheets.googleapis.com/v4/spreadsheets/$sheetId/values/$range?valueRenderOption=FORMULA|j},
+    accessToken
+  )
+  |> Js.Promise.then_(json)
+  |> Js.Promise.then_((data: valuesResponse) => data##values |> Js.Promise.resolve);
 
+[@bs.val] [@bs.scope "localStorage"] external setItem : (string, 'a) => unit = "";
+
+[@bs.val] [@bs.scope "localStorage"] external getItem : string => Js.nullable('a) = "";
