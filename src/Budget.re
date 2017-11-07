@@ -231,6 +231,15 @@ let row = (item) =>
   | Item(_, num, _, _, _) => num
   };
 
+let goalByName = (budget, name) => {
+  let rec loop = (items) => switch items {
+  | [] => None
+  | [Item(n, _, _, _, goal), ..._] when n === name => goal
+  | [_, ...rest] => loop(rest)
+  };
+  loop(Array.to_list(budget.items))
+};
+
 let force = (opt) =>
   switch opt {
   | Some(v) => v

@@ -17,6 +17,7 @@ module Styles = {
   let badDiff = css([backgroundColor("#fee"), textAlign("right"), ...base]);
   let date = css([fontFamily("monospace")]);
   let originalDescription = css([fontFamily("monospace")]);
+  let spacer = css([width("32px")]);
 };
 
 let dollars = (num) => Printf.sprintf("$%0.2f", num);
@@ -165,7 +166,7 @@ let renderUntouched = (~untouched, ~categoryMap, ~year, ~month) => {
   </div>
 };
 
-let renderItem = (~m, ~y, ~item, ~categories, ~categoryMap, ~key, ~reduce, ~name, ~goal, ~isYearly, ~state, ~year, ~month) => {
+let renderItem = (~m, ~y, ~item, ~categories, ~categoryMap, ~key, ~reduce, ~name, ~goal, ~isYearly, ~state, ~year, ~month, ~budgets) => {
   let monthSelected = state == Some((item, categories, Monthly));
   let yearSelected = state == Some((item, categories, Yearly));
   let isSelected = monthSelected || yearSelected;
@@ -181,6 +182,20 @@ let renderItem = (~m, ~y, ~item, ~categories, ~categoryMap, ~key, ~reduce, ~name
       0,
       categories
     );
+  let expectedYtd = if (! isYearly) {
+    let total = ref(0.);
+    for (i in 0 to month) {
+      let goal =
+        Budget.latestBudget(budgets, year, i)
+        |> optBind((budget) => Budget.goalByName(budget, name))
+        |> optOr(0.);
+      /* Js.log3("Reporting") */
+      total := total^ +. goal;
+    };
+    total^ > 0. ? Some(total^) : None
+  } else {
+    goal |> optMap((goal) => goal *. float_of_int(month) /. 12.)
+  };
   <tr
     key
     onClick=(
@@ -217,6 +232,7 @@ let renderItem = (~m, ~y, ~item, ~categories, ~categoryMap, ~key, ~reduce, ~name
         };
       <td className> (str(amount |> optMap(dollars) |> optOr(""))) </td>
     }
+    <td className=Styles.spacer />
     <td className=(Styles.actual ++ " " ++ (yearSelected ? Styles.actualSelected : ""))
     onClick=(
       reduce(
@@ -229,8 +245,21 @@ let renderItem = (~m, ~y, ~item, ~categories, ~categoryMap, ~key, ~reduce, ~name
       )
     )
     > (str(dollars(y))) </td>
+    <td className=Styles.actual>
+        (
+          (expectedYtd) |> optMap((value) => str(dollars(value))) |> optOr(ReasonReact.nullElement)
+        )
+    </td>
+    {
+      [@else ReasonReact.nullElement]
+      [%guard let Some(ytd) = expectedYtd];
+      let diff = ytd -. y;
+      let className = diff >= 0. ? Styles.goodDiff : Styles.badDiff;
+      <td className>
+        (str(dollars(diff)))
+      </td>
+    }
   </tr>
-
 };
 
 /*** TODO maybe add state about enabled budget items */
@@ -265,7 +294,10 @@ let make = (~budgets, ~categoryMap, ~year, ~month, _children) =>
               <th> (str("Goal")) </th>
               <th> (str("Actual")) </th>
               <th> (str("Diff")) </th>
+              <th className=Styles.spacer />
               <th> (str("YTD")) </th>
+              <th> (str("Expected YTD")) </th>
+              <th> (str("YTD Diff")) </th>
             </tr>
           </thead>
           <tbody>
@@ -279,7 +311,7 @@ let make = (~budgets, ~categoryMap, ~year, ~month, _children) =>
                       <tr key> <td className=Styles.title> (str(name)) </td> </tr>
                     | Item(name, row, isYearly, categories, goal) => {
                       let (_, m, y) = amounts[row];
-                      renderItem(~m, ~y, ~item, ~categories, ~categoryMap, ~key, ~reduce, ~name, ~goal, ~isYearly, ~state, ~year, ~month)
+                      renderItem(~m, ~y, ~item, ~categories, ~categoryMap, ~key, ~reduce, ~name, ~goal, ~isYearly, ~state, ~year, ~month, ~budgets)
                     }
                     | Calculated(name, row, isYearly, _, goal, flip) =>
                       let (g, m, y) = amounts[row];
@@ -292,6 +324,7 @@ let make = (~budgets, ~categoryMap, ~year, ~month, _children) =>
                           let className = amount > 0. ? Styles.goodDiff : Styles.badDiff;
                           <td className> (str(dollars @@ amount)) </td>
                         }
+                        <td className=Styles.spacer />
                         <td className=Styles.actual> (str(dollars(y))) </td>
                       </tr>
                     | Sum(name, row, isYearly, _) =>
@@ -305,6 +338,7 @@ let make = (~budgets, ~categoryMap, ~year, ~month, _children) =>
                           let className = amount > 0. ? Styles.goodDiff : Styles.badDiff;
                           <td className> (str(dollars @@ amount)) </td>
                         }
+                        <td className=Styles.spacer />
                         <td className=Styles.actual> (str(dollars(y))) </td>
                       </tr>
                     };
