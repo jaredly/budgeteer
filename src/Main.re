@@ -1,5 +1,12 @@
 [@bs.module] external config : Sheet.config = "../../../config.js";
 
+/** Auto-https */
+[%bs.raw {|
+  if (location.protocol === 'http:' && location.hostname !== 'localhost') {
+    location.href = 'https:' + location.href.slice('http:'.length)
+  }
+|}];
+
 let signIn = () => {
   let init =
     Auth.init({

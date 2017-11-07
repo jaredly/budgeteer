@@ -7,6 +7,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "serve": "cd public; http-server -p 2030 -c-1",
+    "deploy": "cd public; surge -d budgeteer.jaredforsyth.com .",
     "start": "bsb -make-world -w",
     "build": "bsb -make-world" ,
     "webpack": "webpack -w",
